@@ -6,7 +6,7 @@ from pathlib import Path
 # Base directory for the project.
 BASE_DIR = Path(__file__).resolve().parent
 
-# YOLOv8 model configuration.
+# YOLOv8 model identifier. Ultralytics auto-downloads this model at runtime.
 MODEL_PATH = "yolov8n.pt"
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45

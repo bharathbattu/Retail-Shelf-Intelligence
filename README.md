@@ -30,7 +30,7 @@ It is designed as a lightweight, practical foundation for retail automation use 
 | Computer Vision | OpenCV |
 | Dashboard | Streamlit |
 | Data Handling | Native Python structures, TypedDict-based domain models |
-| Inference Asset | `yolov8n.pt` |
+| Inference Asset | Auto-downloaded `yolov8n.pt` via Ultralytics |
 
 ## System Architecture
 
@@ -88,15 +88,16 @@ source .venv/bin/activate
 ### 3. Install Dependencies
 
 ```bash
-pip install ultralytics opencv-python streamlit
+pip install -r requirements.txt
 ```
 
 ### 4. Verify Project Assets
 
-Make sure these files are present before running the app:
+Make sure this local file is present before running the app:
 
-- `yolov8n.pt` for YOLO inference
 - `images/shelf.jpg` for the default CLI image example
+
+The YOLOv8 model (`yolov8n.pt`) is automatically downloaded at runtime.
 
 ## How to Run
 
@@ -124,6 +125,18 @@ streamlit run app.py
 ```
 
 Then open the local URL shown by Streamlit in your browser.
+
+## Deployment
+
+This app is deployed using Streamlit Community Cloud.
+
+Run locally:
+
+```bash
+streamlit run app.py
+```
+
+The YOLOv8 model is automatically downloaded at runtime.
 
 The dashboard currently supports uploaded shelf images and displays:
 
@@ -191,7 +204,7 @@ Retail Shelf Intelligence System/
 |-- config.py             # Model paths, thresholds, and runtime settings
 |-- domain_types.py       # Shared typed data structures
 |-- utils.py              # Utility helpers
-|-- yolov8n.pt            # YOLOv8 model weights
+|-- requirements.txt      # Runtime dependencies for local/dev/cloud
 `-- images/
     |-- shelf.jpg         # Sample shelf image
     `-- .gitkeep

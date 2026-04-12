@@ -1,7 +1,11 @@
 # Python cache artifacts
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
+
+# Model artifacts
+*.pt
 
 # Virtual environments
 .venv/

@@ -28,7 +28,7 @@ class ShelfDetector:
                 "Ultralytics is not installed. Install it with: pip install ultralytics"
             ) from ULTRALYTICS_IMPORT_ERROR
 
-        # Load the YOLO model once when the detector is created.
+        # Load once on startup. Ultralytics downloads the model automatically if needed.
         self.model = YOLO(model_path)
         self.last_result: Any | None = None
 
