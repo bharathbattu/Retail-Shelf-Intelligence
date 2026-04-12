@@ -35,6 +35,17 @@ def load_detector() -> ShelfDetector:
     return ShelfDetector()
 
 
+def render_ultralytics_debug_status() -> None:
+    """Show whether Ultralytics can be imported in the current runtime."""
+    try:
+        from ultralytics import YOLO as _YOLO
+
+        del _YOLO
+        st.success("✅ Ultralytics loaded successfully")
+    except Exception as error:  # pragma: no cover - runtime environment specific
+        st.error(f"❌ Ultralytics failed: {error}")
+
+
 def inject_custom_css() -> None:
     """Apply a premium dashboard skin on top of the default Streamlit UI."""
     st.markdown(
@@ -839,6 +850,7 @@ def main() -> None:
     )
     inject_custom_css()
     render_header()
+    render_ultralytics_debug_status()
 
     uploaded_file, controls = render_sidebar()
 
@@ -859,8 +871,8 @@ def main() -> None:
             st.success("✅ Analysis complete. Insights ready.")
 
         render_dashboard(results, controls)
-    except ImportError as error:
-        st.error(f"Dependency error: {error}")
+    except RuntimeError as error:
+        st.error(f"Runtime error: {error}")
     except Exception as error:  # pragma: no cover - UI safeguard
         st.error(f"Unable to analyze the uploaded image: {error}")
 

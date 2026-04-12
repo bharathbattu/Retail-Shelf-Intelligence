@@ -1,0 +1,43 @@
+{
+  "multiple_objects": [
+    {
+      "class_id": 0,
+      "class_name": "bottle",
+      "confidence": 0.95,
+      "bbox": [10.0, 20.0, 60.0, 140.0]
+    },
+    {
+      "class_id": 0,
+      "class_name": "bottle",
+      "confidence": 0.92,
+      "bbox": [130.0, 24.0, 180.0, 145.0]
+    },
+    {
+      "class_id": 1,
+      "class_name": "cup",
+      "confidence": 0.88,
+      "bbox": [280.0, 30.0, 330.0, 150.0]
+    }
+  ],
+  "edge_cases": [
+    {
+      "class_id": 2,
+      "class_name": "person",
+      "confidence": 0.76,
+      "bbox": [0.0, 0.0, 40.0, 120.0]
+    },
+    {
+      "class_id": 3,
+      "class_name": "",
+      "confidence": 0.51,
+      "bbox": [50.0, 5.0, 80.0, 90.0]
+    },
+    {
+      "class_id": 4,
+      "class_name": "box",
+      "confidence": 0.60,
+      "bbox": [390.0, 15.0, 440.0, 160.0]
+    }
+  ],
+  "empty_detections": []
+}

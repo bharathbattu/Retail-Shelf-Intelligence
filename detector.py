@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover - depends on local env
 
 try:
     from ultralytics import YOLO
-except ImportError as import_error:  # pragma: no cover - depends on local env
+except Exception as import_error:  # pragma: no cover - depends on local env
     YOLO = None
     ULTRALYTICS_IMPORT_ERROR = import_error
 else:
@@ -24,12 +24,17 @@ class ShelfDetector:
 
     def __init__(self, model_path: str = MODEL_PATH) -> None:
         if YOLO is None:
-            raise ImportError(
-                "Ultralytics is not installed. Install it with: pip install ultralytics"
+            raise RuntimeError(
+                f"Ultralytics failed to load due to: {ULTRALYTICS_IMPORT_ERROR}"
             ) from ULTRALYTICS_IMPORT_ERROR
 
         # Load once on startup. Ultralytics downloads the model automatically if needed.
-        self.model = YOLO(model_path)
+        try:
+            self.model = YOLO(model_path)
+            # Streamlit Cloud runs on CPU-only infrastructure.
+            self.model.to("cpu")
+        except Exception as error:
+            raise RuntimeError(f"Model initialization failed: {error}") from error
         self.last_result: Any | None = None
 
     def detect(

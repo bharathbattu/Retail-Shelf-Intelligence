@@ -149,6 +149,16 @@ The dashboard currently supports uploaded shelf images and displays:
 - processing loader and completion confirmation
 - reset analysis button to clear state and upload a new image
 
+## Testing
+
+This repository uses `pytest` for end-to-end and module-level validation.
+
+Run all tests:
+
+```bash
+pytest tests/
+```
+
 ### Run Video Analysis from Python
 
 The video pipeline is available through `video_processor.py`. A minimal example:
