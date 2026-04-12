@@ -145,6 +145,17 @@ The YOLOv8 model is automatically downloaded at runtime.
 - Avoids libGL-related errors
 - YOLOv8 model downloads automatically at runtime
 
+## Deployment Fix
+
+This project uses:
+
+- opencv-python-headless for compatibility
+- packages.txt to install libGL system dependency
+
+This prevents:
+
+- libGL.so.1 errors in Streamlit Cloud
+
 The dashboard currently supports uploaded shelf images and displays:
 
 - annotated detection image with minimal class-only labels
