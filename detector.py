@@ -2,18 +2,23 @@
 
 from typing import Any
 
+_yolo_class: Any | None = None
+_ultralytics_import_error: Exception | None = None
+
 try:
     import cv2
 except ImportError:  # pragma: no cover - depends on local env
     cv2 = None
 
 try:
-    from ultralytics import YOLO
-except Exception as import_error:  # pragma: no cover - depends on local env
-    YOLO = None
-    ULTRALYTICS_IMPORT_ERROR = import_error
+    from ultralytics import YOLO as _YOLO
+except Exception as error:  # pragma: no cover - depends on local env
+    _ultralytics_import_error = error
 else:
-    ULTRALYTICS_IMPORT_ERROR = None
+    _yolo_class = _YOLO
+
+YOLO: Any | None = _yolo_class
+ULTRALYTICS_IMPORT_ERROR: Exception | None = _ultralytics_import_error
 
 from config import CONFIDENCE_THRESHOLD, IOU_THRESHOLD, MODEL_PATH
 from domain_types import Detection
@@ -25,7 +30,7 @@ class ShelfDetector:
     def __init__(self, model_path: str = MODEL_PATH) -> None:
         if YOLO is None:
             raise RuntimeError(
-                f"Ultralytics failed to load due to: {ULTRALYTICS_IMPORT_ERROR}"
+                f"Ultralytics failed to load: {ULTRALYTICS_IMPORT_ERROR}"
             ) from ULTRALYTICS_IMPORT_ERROR
 
         # Load once on startup. Ultralytics downloads the model automatically if needed.
@@ -45,7 +50,7 @@ class ShelfDetector:
         """Run detection on an image path or frame and return formatted detections."""
         confidence = CONFIDENCE_THRESHOLD if confidence_threshold is None else confidence_threshold
 
-        results = self.model.predict(
+        results: list[Any] = self.model.predict(
             source=source,
             conf=max(0.0, min(float(confidence), 1.0)),
             iou=IOU_THRESHOLD,

@@ -741,6 +741,7 @@ def render_summary_panel(results: dict[str, Any], controls: DashboardControls) -
 def render_category_breakdown_tab(results: dict[str, Any]) -> None:
     """Render category analytics using a chart and a sortable table."""
     category_df: pd.DataFrame = results["category_df"]
+    st_any: Any = st
 
     if category_df.empty:
         st.info("No categories were detected in the uploaded shelf image.")
@@ -748,12 +749,12 @@ def render_category_breakdown_tab(results: dict[str, Any]) -> None:
 
     chart_col, table_col = st.columns([1.2, 1], gap="large")
     with chart_col:
-        st.bar_chart(
+        st_any.bar_chart(
             category_df.set_index("Category")["Count"],
             use_container_width=True,
         )
     with table_col:
-        st.dataframe(
+        st_any.dataframe(
             category_df,
             hide_index=True,
             use_container_width=True,

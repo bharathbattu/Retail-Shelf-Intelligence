@@ -1,7 +1,6 @@
 streamlit
-ultralytics==8.0.196
-torch==2.2.2
-numpy<2
+ultralytics
 opencv-python-headless
+numpy
 pandas
 matplotlib

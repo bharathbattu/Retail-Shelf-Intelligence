@@ -138,6 +138,13 @@ streamlit run app.py
 
 The YOLOv8 model is automatically downloaded at runtime.
 
+## Deployment Notes
+
+- This app runs on Streamlit Cloud (Python 3.14)
+- Dependencies are not pinned to ensure compatibility
+- YOLOv8 model is automatically downloaded at runtime
+- CPU-only execution is enforced
+
 The dashboard currently supports uploaded shelf images and displays:
 
 - annotated detection image with minimal class-only labels
