@@ -1,5 +1,6 @@
 """Video processing pipeline for retail shelf analysis."""
 
+from collections.abc import Callable
 from typing import Any
 
 try:
@@ -20,21 +21,28 @@ class VideoProcessor:
     def __init__(self, detector: ShelfDetector, frame_skip: int = 2) -> None:
         if cv2 is None:
             raise ImportError(
-                "OpenCV is not installed. Install it with: pip install opencv-python"
+                "OpenCV is not installed. Install it with: pip install opencv-python-headless"
             ) from OPENCV_IMPORT_ERROR
 
         self.detector = detector
         self.frame_skip = max(1, frame_skip)
-        self.window_name = "Retail Shelf Intelligence"
 
-    def process_video(self, video_source: str | int) -> None:
-        """Read a video source, process frames, and display the annotated output."""
+    def process_video(
+        self,
+        video_source: str | int,
+        on_frame: Callable[[Any], None] | None = None,
+    ) -> None:
+        """Read a video source and process frames in headless mode.
+
+        Use ``on_frame`` to consume processed frames (for example, to stream,
+        save, or forward them) without relying on GUI windows.
+        """
         capture = cv2.VideoCapture(video_source)
         if not capture.isOpened():
             raise ValueError(f"Unable to open video source: {video_source}")
 
         frame_index = 0
-        last_display_frame: Any | None = None
+        last_output_frame: Any | None = None
 
         try:
             while True:
@@ -52,26 +60,23 @@ class VideoProcessor:
                     if annotated_frame is None:
                         annotated_frame = frame.copy()
 
-                    display_frame = self._overlay_summary(
+                    output_frame = self._overlay_summary(
                         annotated_frame,
                         analysis["total_items"],
                         len(alerts),
                         gap_count,
                     )
-                    last_display_frame = display_frame
+                    last_output_frame = output_frame
                 else:
                     # Reuse the last processed frame to keep playback responsive.
-                    display_frame = last_display_frame if last_display_frame is not None else frame
+                    output_frame = last_output_frame if last_output_frame is not None else frame
 
-                cv2.imshow(self.window_name, display_frame)
-
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
+                if on_frame is not None:
+                    on_frame(output_frame)
 
                 frame_index += 1
         finally:
             capture.release()
-            cv2.destroyAllWindows()
 
     def _overlay_summary(
         self,
@@ -80,12 +85,11 @@ class VideoProcessor:
         alert_count: int,
         gap_count: int,
     ) -> Any:
-        """Draw a compact analytics summary on the displayed frame."""
+        """Draw a compact analytics summary on the processed frame."""
         overlay_lines = [
             f"Total items: {total_items}",
             f"Low stock alerts: {alert_count}",
             f"Gaps detected: {gap_count}",
-            "Press 'q' to quit",
         ]
 
         y_position = 30

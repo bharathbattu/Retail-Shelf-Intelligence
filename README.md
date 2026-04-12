@@ -140,10 +140,10 @@ The YOLOv8 model is automatically downloaded at runtime.
 
 ## Deployment Notes
 
-- This app runs on Streamlit Cloud (Python 3.14)
-- Dependencies are not pinned to ensure compatibility
-- YOLOv8 model is automatically downloaded at runtime
-- CPU-only execution is enforced
+- This app runs in a headless cloud environment
+- Uses opencv-python-headless to avoid GUI dependencies
+- Avoids libGL-related errors
+- YOLOv8 model downloads automatically at runtime
 
 The dashboard currently supports uploaded shelf images and displays:
 
@@ -174,7 +174,7 @@ The video pipeline is available through `video_processor.py`. A minimal example:
 python -c "from detector import ShelfDetector; from video_processor import VideoProcessor; VideoProcessor(ShelfDetector(), frame_skip=2).process_video('path/to/video.mp4')"
 ```
 
-Press `q` to exit the OpenCV video window.
+The video pipeline runs headlessly and does not open GUI windows.
 
 ## Example Outputs
 
