@@ -126,35 +126,25 @@ streamlit run app.py
 
 Then open the local URL shown by Streamlit in your browser.
 
-## Deployment
+## 🚀 Deployment (Render)
 
-This app is deployed using Streamlit Community Cloud.
+Steps:
+1. Push code to GitHub
+2. Go to https://render.com
+3. Create a new Web Service
+4. Connect repository
+5. Render will automatically use render.yaml
+6. Wait for deployment
 
-Run locally:
+The app will be available at:
+https://<your-app>.onrender.com
 
-```bash
-streamlit run app.py
-```
+### Render Runtime Notes
 
-The YOLOv8 model is automatically downloaded at runtime.
-
-## Deployment Notes
-
-- This app runs in a headless cloud environment
-- Uses opencv-python-headless to avoid GUI dependencies
-- Avoids libGL-related errors
-- YOLOv8 model downloads automatically at runtime
-
-## Deployment Fix
-
-This project uses:
-
-- opencv-python-headless for compatibility
-- packages.txt to install libGL system dependency
-
-This prevents:
-
-- libGL.so.1 errors in Streamlit Cloud
+- Runs Streamlit as a Python web service on port `10000`
+- Uses `opencv-python-headless` for cloud-safe OpenCV installs
+- Uses CPU inference (`self.model.to("cpu")`)
+- YOLOv8 model (`yolov8n.pt`) auto-downloads at runtime
 
 The dashboard currently supports uploaded shelf images and displays:
 
