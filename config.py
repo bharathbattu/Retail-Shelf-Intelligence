@@ -10,6 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = "yolov8n.pt"
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
+INFERENCE_IMAGE_SIZE = (640, 640)
 
 # Input image configuration.
 IMAGE_PATH = BASE_DIR / "images" / "shelf.jpg"

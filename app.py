@@ -5,19 +5,29 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from html import escape
-from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Any
+import time
+from typing import Any, cast
 
+_opencv_import_error: Exception | None = None
+try:
+    import cv2
+except ImportError as import_error:  # pragma: no cover - depends on runtime env
+    cv2 = None
+    _opencv_import_error = import_error
+
+import numpy as np
 import pandas as pd
 import streamlit as st
 
 from analytics import analyze_detections, detect_gaps, evaluate_stock
-from config import CONFIDENCE_THRESHOLD
+from config import CONFIDENCE_THRESHOLD, INFERENCE_IMAGE_SIZE
 from detector import ShelfDetector
+from domain_types import Detection
 
 RESULTS_STATE_KEY = "shelf_dashboard_results"
+PROCESSED_SIGNATURE_KEY = "processed_upload_signature"
 UPLOAD_WIDGET_KEY = "uploaded_shelf_image"
+ANALYZE_BUTTON_KEY = "analyze_uploaded_shelf"
 
 
 @dataclass(frozen=True)
@@ -30,9 +40,65 @@ class DashboardControls:
 
 
 @st.cache_resource
-def load_detector() -> ShelfDetector:
+def load_model() -> ShelfDetector:
     """Load and cache the YOLO detector so the model is reused across reruns."""
     return ShelfDetector()
+
+
+def load_detector() -> ShelfDetector:
+    """Backward-compatible alias used by existing tests and call sites."""
+    return load_model()
+
+
+def preprocess_image_for_inference(file_bytes: bytes) -> np.ndarray:
+    """Decode and resize an uploaded image for faster CPU inference."""
+    if cv2 is None:
+        raise RuntimeError(
+            "OpenCV is required for image preprocessing but is unavailable. "
+            "Install opencv-python-headless."
+        ) from _opencv_import_error
+
+    image_buffer = np.frombuffer(file_bytes, dtype=np.uint8)
+    decoded_image = cv2.imdecode(image_buffer, cv2.IMREAD_COLOR)
+    if decoded_image is None:
+        raise ValueError("Uploaded image could not be decoded.")
+
+    width, height = INFERENCE_IMAGE_SIZE
+    return cv2.resize(decoded_image, (int(width), int(height)), interpolation=cv2.INTER_AREA)
+
+
+@st.cache_data(show_spinner=False)
+def run_detection(image_bytes: bytes, confidence_threshold: float) -> dict[str, Any]:
+    """Cache detection output for identical image+threshold inputs."""
+    detector = load_detector()
+    resized_image = preprocess_image_for_inference(image_bytes)
+
+    # Keep compatibility with lightweight test doubles that implement detect/get_annotated_frame.
+    if hasattr(detector, "detect_with_annotation"):
+        run_result = detector.detect_with_annotation(
+            resized_image,
+            confidence_threshold=confidence_threshold,
+        )
+        detections: list[Detection] = run_result.detections
+        annotated_image = run_result.annotated_frame
+        inference_seconds = run_result.inference_seconds
+    else:
+        inference_start = time.perf_counter()
+        detections = detector.detect(
+            resized_image,
+            confidence_threshold=confidence_threshold,
+        )
+        inference_seconds = time.perf_counter() - inference_start
+        annotated_image = (
+            detector.get_annotated_frame() if hasattr(detector, "get_annotated_frame") else None
+        )
+
+    return {
+        "detections": detections,
+        "annotated_image": annotated_image,
+        "inference_seconds": inference_seconds,
+        "input_resolution": f"{resized_image.shape[1]}x{resized_image.shape[0]}",
+    }
 
 
 def render_ultralytics_debug_status() -> None:
@@ -451,7 +517,7 @@ def render_panel_heading(icon: str, title: str, kicker: str) -> None:
     )
 
 
-def render_sidebar() -> tuple[Any | None, DashboardControls]:
+def render_sidebar() -> tuple[Any | None, DashboardControls, bool]:
     """Render the sidebar upload and dashboard controls."""
     with st.sidebar:
         st.markdown("## Control Center")
@@ -482,6 +548,13 @@ def render_sidebar() -> tuple[Any | None, DashboardControls]:
         )
         show_bounding_boxes = st.toggle("Show bounding boxes", value=True)
         show_analytics = st.toggle("Show analytics", value=True)
+        analyze_requested = st.button(
+            "Analyze",
+            key=ANALYZE_BUTTON_KEY,
+            type="primary",
+            use_container_width=True,
+            help="Run AI detection for the current upload and confidence threshold.",
+        )
 
         st.markdown("---")
         st.markdown("### About Project")
@@ -497,26 +570,22 @@ def render_sidebar() -> tuple[Any | None, DashboardControls]:
         )
         st.caption("Designed for modern retail ops, merchandising, and store intelligence workflows.")
 
-    return uploaded_file, DashboardControls(
-        confidence_threshold=confidence_threshold,
-        show_bounding_boxes=show_bounding_boxes,
-        show_analytics=show_analytics,
+    return (
+        uploaded_file,
+        DashboardControls(
+            confidence_threshold=confidence_threshold,
+            show_bounding_boxes=show_bounding_boxes,
+            show_analytics=show_analytics,
+        ),
+        analyze_requested,
     )
-
-
-def save_uploaded_image(file_bytes: bytes, filename: str) -> Path:
-    """Persist uploaded image bytes to a temporary file for YOLO processing."""
-    suffix = Path(filename).suffix or ".jpg"
-
-    with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
-        temp_file.write(file_bytes)
-        return Path(temp_file.name)
 
 
 def reset_dashboard_state() -> None:
     """Clear session state so the app returns to a fresh upload state."""
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
+    for key in (RESULTS_STATE_KEY, PROCESSED_SIGNATURE_KEY, UPLOAD_WIDGET_KEY):
+        if key in st.session_state:
+            del st.session_state[key]
 
     st.rerun()
 
@@ -555,31 +624,30 @@ def process_uploaded_image(
     confidence_threshold: float,
 ) -> dict[str, Any]:
     """Run the detection pipeline and package dashboard-ready results."""
-    temp_image_path = save_uploaded_image(file_bytes, filename)
+    pipeline_start = time.perf_counter()
+    detection_output = run_detection(
+        image_bytes=file_bytes,
+        confidence_threshold=confidence_threshold,
+    )
+    detections = cast(list[Detection], detection_output["detections"])
+    analysis = analyze_detections(detections)
+    alerts = evaluate_stock(analysis)
+    gap_count = detect_gaps(detections)
+    pipeline_seconds = time.perf_counter() - pipeline_start
 
-    try:
-        detector = load_detector()
-        detections = detector.detect(
-            str(temp_image_path),
-            confidence_threshold=confidence_threshold,
-        )
-        analysis = analyze_detections(detections)
-        alerts = evaluate_stock(analysis)
-        gap_count = detect_gaps(detections)
-        annotated_image = detector.get_annotated_frame()
-
-        return {
-            "file_name": filename,
-            "original_image": file_bytes,
-            "annotated_image": annotated_image,
-            "analysis": analysis,
-            "alerts": alerts,
-            "gap_count": gap_count,
-            "category_df": build_category_dataframe(analysis["category_counts"]),
-            "primary_category": get_primary_category(analysis["category_counts"]),
-        }
-    finally:
-        temp_image_path.unlink(missing_ok=True)
+    return {
+        "file_name": filename,
+        "original_image": file_bytes,
+        "annotated_image": detection_output["annotated_image"],
+        "analysis": analysis,
+        "alerts": alerts,
+        "gap_count": gap_count,
+        "category_df": build_category_dataframe(analysis["category_counts"]),
+        "primary_category": get_primary_category(analysis["category_counts"]),
+        "inference_seconds": float(detection_output["inference_seconds"]),
+        "pipeline_seconds": float(pipeline_seconds),
+        "input_resolution": str(detection_output["input_resolution"]),
+    }
 
 
 def get_or_process_results(
@@ -596,16 +664,22 @@ def get_or_process_results(
 
     # Improvement 2: show explicit processing feedback while the pipeline runs.
     with st.spinner("🔍 Analyzing shelf..."):
+        progress = st.progress(5, text="Preparing image...")
         payload = process_uploaded_image(
             file_bytes=file_bytes,
             filename=filename,
             confidence_threshold=controls.confidence_threshold,
         )
+        progress.progress(100, text="Analysis complete")
+        progress.empty()
+
+    payload["cache_hit"] = False
 
     st.session_state[RESULTS_STATE_KEY] = {
         "signature": signature,
         "payload": payload,
     }
+    st.session_state[PROCESSED_SIGNATURE_KEY] = signature
     return payload, True
 
 
@@ -658,6 +732,7 @@ def render_analysis_meta(results: dict[str, Any], controls: DashboardControls) -
             <span class="info-pill">🎯 Confidence {controls.confidence_threshold:.2f}</span>
             <span class="info-pill">🚨 {len(results["alerts"])} alerts</span>
             <span class="info-pill">🏷️ Primary: {escaped_primary_category}</span>
+            <span class="info-pill">⚡ Inference {results.get("inference_seconds", 0.0):.2f}s</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -715,6 +790,13 @@ def render_summary_panel(results: dict[str, Any], controls: DashboardControls) -
         st.caption(
             "Unique Categories counts distinct detected product classes. "
             "Shelf Gaps highlights visible horizontal spacing between adjacent items."
+        )
+        st.write(
+            (
+                f"Inference time: {results.get('inference_seconds', 0.0):.2f}s | "
+                f"Pipeline time: {results.get('pipeline_seconds', 0.0):.2f}s | "
+                f"Input: {results.get('input_resolution', 'n/a')}"
+            )
         )
 
         st.markdown(
@@ -853,23 +935,46 @@ def main() -> None:
     render_header()
     render_ultralytics_debug_status()
 
-    uploaded_file, controls = render_sidebar()
+    uploaded_file, controls, analyze_requested = render_sidebar()
 
     if uploaded_file is None:
         render_empty_state()
         return
 
     file_bytes = uploaded_file.getvalue()
+    current_signature = get_upload_signature(file_bytes, controls.confidence_threshold)
+    processed_signature = st.session_state.get(PROCESSED_SIGNATURE_KEY)
+    cached_state = st.session_state.get(RESULTS_STATE_KEY)
+    cached_payload: dict[str, Any] | None = None
+
+    if cached_state and cached_state.get("signature") == current_signature:
+        cached_payload = dict(cached_state["payload"])
+        cached_payload["cache_hit"] = True
+
+    if not analyze_requested and cached_payload is None:
+        st.info("Upload ready. Click Analyze to run AI detection.")
+        return
+
+    if not analyze_requested and processed_signature != current_signature and cached_payload is not None:
+        st.caption("Showing cached analysis for the current image and threshold.")
 
     try:
-        results, processed_now = get_or_process_results(
-            file_bytes=file_bytes,
-            filename=uploaded_file.name,
-            controls=controls,
-        )
+        if analyze_requested:
+            results, processed_now = get_or_process_results(
+                file_bytes=file_bytes,
+                filename=uploaded_file.name,
+                controls=controls,
+            )
+        elif cached_payload is not None:
+            results, processed_now = cached_payload, False
+        else:
+            st.info("Click Analyze to generate insights for the uploaded image.")
+            return
 
         if processed_now:
             st.success("✅ Analysis complete. Insights ready.")
+        elif results.get("cache_hit"):
+            st.caption("Serving cached results to keep the UI responsive.")
 
         render_dashboard(results, controls)
     except RuntimeError as error:

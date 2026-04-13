@@ -24,6 +24,11 @@ class FakeResult:
     def __init__(self, boxes: list[FakeBox], names: dict[int, str]) -> None:
         self.boxes = boxes
         self.names = names
+        self.orig_img = np.zeros((180, 180, 3), dtype=np.uint8)
+
+    def plot(self, conf: bool, line_width: int, font_size: int) -> np.ndarray:
+        del conf, line_width, font_size
+        return self.orig_img.copy()
 
 
 class FakeYOLO:

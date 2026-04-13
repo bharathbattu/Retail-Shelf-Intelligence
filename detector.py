@@ -1,5 +1,9 @@
 """Model loading and image detection logic."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+import time
 from typing import Any
 
 _yolo_class: Any | None = None
@@ -22,6 +26,15 @@ ULTRALYTICS_IMPORT_ERROR: Exception | None = _ultralytics_import_error
 
 from config import CONFIDENCE_THRESHOLD, IOU_THRESHOLD, MODEL_PATH
 from domain_types import Detection
+
+
+@dataclass(frozen=True)
+class DetectionRunResult:
+    """Structured result for a single detection pass."""
+
+    detections: list[Detection]
+    annotated_frame: Any | None
+    inference_seconds: float
 
 
 class ShelfDetector:
@@ -48,16 +61,41 @@ class ShelfDetector:
         confidence_threshold: float | None = None,
     ) -> list[Detection]:
         """Run detection on an image path or frame and return formatted detections."""
+        return self.detect_with_annotation(
+            source=source,
+            confidence_threshold=confidence_threshold,
+        ).detections
+
+    def detect_with_annotation(
+        self,
+        source: str | Any,
+        confidence_threshold: float | None = None,
+    ) -> DetectionRunResult:
+        """Run detection once and return both detections and the rendered overlay."""
         confidence = CONFIDENCE_THRESHOLD if confidence_threshold is None else confidence_threshold
 
+        start_time = time.perf_counter()
         results: list[Any] = self.model.predict(
             source=source,
             conf=max(0.0, min(float(confidence), 1.0)),
             iou=IOU_THRESHOLD,
             verbose=False,
         )
+        inference_seconds = time.perf_counter() - start_time
 
-        return self._format_results(results)
+        detections, first_result = self._extract_detections(results)
+        self.last_result = first_result
+        annotated_frame = (
+            self._render_minimal_annotations(first_result)
+            if first_result is not None
+            else None
+        )
+
+        return DetectionRunResult(
+            detections=detections,
+            annotated_frame=annotated_frame,
+            inference_seconds=inference_seconds,
+        )
 
     def get_annotated_frame(self) -> Any | None:
         """Return the most recent YOLO-annotated frame, if available."""
@@ -130,14 +168,12 @@ class ShelfDetector:
 
         return frame
 
-    def _format_results(self, results: list[Any]) -> list[Detection]:
+    def _extract_detections(self, results: list[Any]) -> tuple[list[Detection], Any | None]:
         """Convert YOLO results into a simple Python list of dictionaries."""
         if not results:
-            self.last_result = None
-            return []
+            return [], None
 
         result = results[0]
-        self.last_result = result
         names = result.names
         detections: list[Detection] = []
 
@@ -156,4 +192,4 @@ class ShelfDetector:
                 }
             )
 
-        return detections
+        return detections, result

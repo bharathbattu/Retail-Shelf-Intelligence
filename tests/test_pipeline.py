@@ -27,8 +27,8 @@ class FakeDetector:
     def __init__(self, detections: list[dict[str, object]]) -> None:
         self._detections = detections
 
-    def detect(self, source: str, confidence_threshold: float | None = None) -> list[dict[str, object]]:
-        if not source:
+    def detect(self, source: object, confidence_threshold: float | None = None) -> list[dict[str, object]]:
+        if source is None:
             raise ValueError("Source path is required")
 
         del confidence_threshold
@@ -64,7 +64,13 @@ def test_e2e_pipeline_builds_ui_ready_payload(monkeypatch: pytest.MonkeyPatch) -
     detections = test_data["multiple_objects"] + [test_data["edge_cases"][0]]
     fake_detector = FakeDetector(detections)
 
+    app.run_detection.clear()
     monkeypatch.setattr(app, "load_detector", lambda: fake_detector)
+    monkeypatch.setattr(
+        app,
+        "preprocess_image_for_inference",
+        lambda file_bytes: np.zeros((640, 640, 3), dtype=np.uint8),
+    )
 
     payload = app.process_uploaded_image(
         file_bytes=b"fake-image-bytes",
