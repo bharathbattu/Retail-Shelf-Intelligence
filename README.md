@@ -9,6 +9,11 @@ An AI-powered computer vision project for monitoring retail shelves from images 
 
 It is designed as a lightweight, practical foundation for retail automation use cases such as shelf auditing, stock visibility checks, and category-level merchandising insights.
 
+## Live App
+
+Production URL:
+https://retail-shelf-intelligence-gs91.onrender.com
+
 ## Key Features
 
 - Detects products and shelf objects from retail shelf images
@@ -136,8 +141,8 @@ Steps:
 5. Render will automatically use render.yaml
 6. Wait for deployment
 
-The app will be available at:
-https://<your-app>.onrender.com
+The app is available at:
+https://retail-shelf-intelligence-gs91.onrender.com
 
 ### Render Runtime Notes
 
